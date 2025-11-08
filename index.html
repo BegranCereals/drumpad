@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini Drumpad</title>
+<title>Mini Drumpad mit Loop-Schalter</title>
 <style>
   body {
     font-family: sans-serif;
@@ -21,10 +21,11 @@
     background: #444;
     border: none;
     border-radius: 10px;
-    height: 100px;
+    height: 120px;
     color: white;
-    font-size: 16px;
+    font-size: 14px;
     position: relative;
+    padding: 5px;
   }
   .pad.active {
     background: gold;
@@ -35,6 +36,14 @@
     right: 10px;
     font-size: 20px;
     cursor: pointer;
+  }
+  .loop-switch {
+    position: absolute;
+    bottom: 5px;
+    left: 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #0f0;
   }
   button#stopBtn {
     margin-top: 20px;
@@ -61,7 +70,7 @@ const stopBtn = document.getElementById("stopBtn");
 for (let i = 0; i < 8; i++) {
   const pad = document.createElement("button");
   pad.className = "pad";
-  pad.innerHTML = `Pad ${i+1} <span class="menu">⋮</span>`;
+  pad.innerHTML = `Pad ${i+1} <span class="menu">⋮</span><br><span class="loop-switch">Loop: Off</span>`;
   padGrid.appendChild(pad);
 
   pads.push({ element: pad, sound: null, loop: false, audio: null });
@@ -73,6 +82,12 @@ for (let i = 0; i < 8; i++) {
   pad.querySelector(".menu").addEventListener("click", (event) => {
     event.stopPropagation();
     selectFile(i);
+  });
+
+  // Loop-Schalter
+  pad.querySelector(".loop-switch").addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleLoop(i);
   });
 }
 
@@ -86,37 +101,57 @@ function selectFile(i) {
     if (file) {
       const url = URL.createObjectURL(file);
       pads[i].sound = url;
-      pads[i].element.innerHTML = `Pad ${i+1}<br>${file.name} <span class="menu">⋮</span>`;
-      pads[i].element.querySelector(".menu").addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        selectFile(i);
-      });
+      updatePadText(i);
     }
   };
   input.click();
 }
 
-// Sound abspielen / loopen
+// Loop-Schalter umschalten
+function toggleLoop(i) {
+  pads[i].loop = !pads[i].loop;
+  updatePadText(i);
+}
+
+// Text und Loop-Anzeige aktualisieren
+function updatePadText(i) {
+  const pad = pads[i];
+  const filename = pad.sound ? pad.sound.split("/").pop() : "";
+  const loopText = pad.loop ? "On" : "Off";
+  pad.element.innerHTML = `Pad ${i+1}<br>${filename}<span class="menu">⋮</span><br><span class="loop-switch">Loop: ${loopText}</span>`;
+
+  // EventListener neu setzen (wegen innerHTML)
+  pad.element.querySelector(".menu").addEventListener("click", (ev) => { ev.stopPropagation(); selectFile(i); });
+  pad.element.querySelector(".loop-switch").addEventListener("click", (ev) => { ev.stopPropagation(); toggleLoop(i); });
+}
+
+// Sound abspielen
 function playSound(i) {
   const pad = pads[i];
   if (!pad.sound) return;
 
-  // Falls Loop aktiv -> stoppen
   if (pad.loop) {
-    pad.audio.pause();
-    pad.audio.currentTime = 0;
-    pad.loop = false;
-    pad.element.classList.remove("active");
-    return;
+    // Loop-Play
+    if (pad.audio && !pad.audio.paused) {
+      // Wenn schon läuft, stoppen
+      pad.audio.pause();
+      pad.audio.currentTime = 0;
+      pad.element.classList.remove("active");
+      return;
+    }
+    const audio = new Audio(pad.sound);
+    audio.loop = true;
+    audio.play();
+    pad.audio = audio;
+    pad.element.classList.add("active");
+  } else {
+    // Einmal abspielen
+    const audio = new Audio(pad.sound);
+    audio.play();
+    pad.audio = audio;
+    pad.element.classList.add("active");
+    audio.onended = () => pad.element.classList.remove("active");
   }
-
-  const audio = new Audio(pad.sound);
-  pad.audio = audio;
-  pad.loop = true;
-  pad.element.classList.add("active");
-
-  audio.loop = true;
-  audio.play();
 }
 
 // STOP-Button: alles stoppen
@@ -125,7 +160,6 @@ stopBtn.addEventListener("click", () => {
     if (pad.audio) {
       pad.audio.pause();
       pad.audio.currentTime = 0;
-      pad.loop = false;
       pad.element.classList.remove("active");
     }
   });
