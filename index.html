@@ -3,167 +3,205 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini Drumpad mit Loop-Schalter</title>
+<title>Mini Drumpad Studio Plus</title>
 <style>
-  body {
-    font-family: sans-serif;
-    background: #111;
-    color: white;
-    text-align: center;
-  }
-  .pad-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin: 20px;
-  }
-  .pad {
-    background: #444;
-    border: none;
-    border-radius: 10px;
-    height: 120px;
-    color: white;
-    font-size: 14px;
-    position: relative;
-    padding: 5px;
-  }
-  .pad.active {
-    background: gold;
-  }
-  .menu {
-    position: absolute;
-    top: 5px;
-    right: 10px;
-    font-size: 20px;
-    cursor: pointer;
-  }
-  .loop-switch {
-    position: absolute;
-    bottom: 5px;
-    left: 10px;
-    font-size: 12px;
-    cursor: pointer;
-    color: #0f0;
-  }
-  button#stopBtn {
-    margin-top: 20px;
-    background: red;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 10px 20px;
-    font-size: 18px;
-  }
+body {
+  font-family: sans-serif;
+  background: #111;
+  color: white;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+h1 { margin-top: 20px; }
+.pad-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 20px;
+}
+.pad {
+  background: #444;
+  border: none;
+  border-radius: 10px;
+  height: 120px;
+  color: white;
+  font-size: 14px;
+  position: relative;
+  padding: 5px;
+  transition: background 0.2s;
+}
+.pad.loop-active {
+  background: #0f0;
+  animation: pulse 1s infinite;
+}
+.pad.oneshot-active {
+  background: gold;
+}
+.menu {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  font-size: 20px;
+  cursor: pointer;
+}
+.loop-switch {
+  position: absolute;
+  bottom: 5px;
+  left: 10px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #0f0;
+}
+button#stopBtn, button#addPadBtn {
+  margin-top: 10px;
+  background: red;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
 </style>
 </head>
 <body>
-<h1>🎧 Mini Drumpad</h1>
+<h1>🎧 Mini Drumpad Studio Plus</h1>
+<button id="addPadBtn">+ Pad hinzufügen</button>
 <div class="pad-grid" id="padGrid"></div>
 <button id="stopBtn">STOP</button>
 
 <script>
-const pads = [];
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const padGrid = document.getElementById("padGrid");
 const stopBtn = document.getElementById("stopBtn");
+const addPadBtn = document.getElementById("addPadBtn");
 
-// 8 Pads erstellen
-for (let i = 0; i < 8; i++) {
-  const pad = document.createElement("button");
-  pad.className = "pad";
-  pad.innerHTML = `Pad ${i+1} <span class="menu">⋮</span><br><span class="loop-switch">Loop: Off</span>`;
-  padGrid.appendChild(pad);
+const pads = [];
 
-  pads.push({ element: pad, sound: null, loop: false, audio: null });
+// Funktion um Pads zu erstellen
+function createPad() {
+  const padIndex = pads.length;
+  const padEl = document.createElement("button");
+  padEl.className = "pad";
+  padEl.innerHTML = `Pad ${padIndex+1}<span class="menu">⋮</span><br><span class="loop-switch">Loop: Off</span>`;
+  padGrid.appendChild(padEl);
 
-  // Klick -> Sound abspielen
-  pad.addEventListener("click", () => playSound(i));
+  const pad = {
+    element: padEl,
+    buffer: null,
+    source: null,
+    gain: null,
+    loop: false
+  };
+  pads.push(pad);
 
-  // Dreipunkt-Menü -> Datei wählen
-  pad.querySelector(".menu").addEventListener("click", (event) => {
-    event.stopPropagation();
-    selectFile(i);
+  // Pad klicken -> Sound abspielen
+  padEl.addEventListener("click", () => playSound(padIndex));
+
+  // Dreipunkt-Menü -> Datei auswählen
+  padEl.querySelector(".menu").addEventListener("click", e => {
+    e.stopPropagation();
+    loadSound(padIndex);
   });
 
   // Loop-Schalter
-  pad.querySelector(".loop-switch").addEventListener("click", (event) => {
-    event.stopPropagation();
-    toggleLoop(i);
+  padEl.querySelector(".loop-switch").addEventListener("click", e => {
+    e.stopPropagation();
+    toggleLoop(padIndex);
   });
 }
 
+// Starte mit 8 Pads
+for (let i=0;i<8;i++) createPad();
+
+// + Pad hinzufügen
+addPadBtn.addEventListener("click", createPad);
+
 // Datei auswählen
-function selectFile(i) {
+async function loadSound(i) {
   const input = document.createElement("input");
   input.type = "file";
   input.accept = "audio/*";
-  input.onchange = e => {
+  input.onchange = async e => {
     const file = e.target.files[0];
-    if (file) {
-      const url = URL.createObjectURL(file);
-      pads[i].sound = url;
-      updatePadText(i);
-    }
+    const arrayBuffer = await file.arrayBuffer();
+    pads[i].buffer = await audioCtx.decodeAudioData(arrayBuffer);
+    updatePadText(i);
   };
   input.click();
 }
 
-// Loop-Schalter umschalten
+// Loop-Schalter
 function toggleLoop(i) {
   pads[i].loop = !pads[i].loop;
   updatePadText(i);
 }
 
-// Text und Loop-Anzeige aktualisieren
+// Pad-Text aktualisieren
 function updatePadText(i) {
   const pad = pads[i];
-  const filename = pad.sound ? pad.sound.split("/").pop() : "";
+  const filename = pad.buffer ? "Audio Loaded" : "";
   const loopText = pad.loop ? "On" : "Off";
   pad.element.innerHTML = `Pad ${i+1}<br>${filename}<span class="menu">⋮</span><br><span class="loop-switch">Loop: ${loopText}</span>`;
 
-  // EventListener neu setzen (wegen innerHTML)
-  pad.element.querySelector(".menu").addEventListener("click", (ev) => { ev.stopPropagation(); selectFile(i); });
-  pad.element.querySelector(".loop-switch").addEventListener("click", (ev) => { ev.stopPropagation(); toggleLoop(i); });
+  // EventListener neu setzen
+  pad.element.querySelector(".menu").addEventListener("click", e => { e.stopPropagation(); loadSound(i); });
+  pad.element.querySelector(".loop-switch").addEventListener("click", e => { e.stopPropagation(); toggleLoop(i); });
 }
 
 // Sound abspielen
 function playSound(i) {
   const pad = pads[i];
-  if (!pad.sound) return;
+  if (!pad.buffer) return;
 
   if (pad.loop) {
     // Loop-Play
-    if (pad.audio && !pad.audio.paused) {
-      // Wenn schon läuft, stoppen
-      pad.audio.pause();
-      pad.audio.currentTime = 0;
-      pad.element.classList.remove("active");
-      return;
+    if (!pad.source) {
+      const source = audioCtx.createBufferSource();
+      source.buffer = pad.buffer;
+      source.loop = true;
+
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0;
+
+      source.connect(gain).connect(audioCtx.destination);
+      source.start(0);
+      gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.2); // Fade-In
+
+      pad.source = source;
+      pad.gain = gain;
+      pad.element.classList.add("loop-active");
+    } else {
+      fadeOutLoop(pad);
     }
-    const audio = new Audio(pad.sound);
-    audio.loop = true;
-    audio.play();
-    pad.audio = audio;
-    pad.element.classList.add("active");
   } else {
-    // Einmal abspielen
-    const audio = new Audio(pad.sound);
-    audio.play();
-    pad.audio = audio;
-    pad.element.classList.add("active");
-    audio.onended = () => pad.element.classList.remove("active");
+    // One-Shot
+    const source = audioCtx.createBufferSource();
+    source.buffer = pad.buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.value = 1;
+    source.connect(gain).connect(audioCtx.destination);
+    source.start(0);
+    pad.element.classList.add("oneshot-active");
+    source.onended = () => pad.element.classList.remove("oneshot-active");
   }
 }
 
-// STOP-Button: alles stoppen
-stopBtn.addEventListener("click", () => {
-  pads.forEach(pad => {
-    if (pad.audio) {
-      pad.audio.pause();
-      pad.audio.currentTime = 0;
-      pad.element.classList.remove("active");
-    }
-  });
-});
-</script>
-</body>
-</html>
+// Loop fade-out
+function fadeOutLoop(pad) {
+  if (!pad.gain || !pad.source) return;
+  pad.gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+  setTimeout(() => {
+    pad.source.stop();
+    pad.source.disconnect();
+    pad.gain.disconnect();
+    pad.source = null;
+    pad.gain = null;
+    pad.element.classList.remove("loop-active");
+  }, 220)
