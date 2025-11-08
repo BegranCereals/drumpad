@@ -204,4 +204,15 @@ function fadeOutLoop(pad) {
     pad.source = null;
     pad.gain = null;
     pad.element.classList.remove("loop-active");
-  }, 220)
+  }, 220);
+}
+
+// STOP-Button
+stopBtn.addEventListener("click", () => {
+  pads.forEach(pad => {
+    if (pad.source) fadeOutLoop(pad);
+  });
+});
+</script>
+</body>
+</html>
