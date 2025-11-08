@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Drumpad</title>
+<style>
+  body {
+    font-family: sans-serif;
+    background: #111;
+    color: white;
+    text-align: center;
+  }
+  .pad-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 20px;
+  }
+  .pad {
+    background: #444;
+    border: none;
+    border-radius: 10px;
+    height: 100px;
+    color: white;
+    font-size: 16px;
+    position: relative;
+  }
+  .pad.active {
+    background: gold;
+  }
+  .menu {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    font-size: 20px;
+    cursor: pointer;
+  }
+  button#stopBtn {
+    margin-top: 20px;
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 18px;
+  }
+</style>
+</head>
+<body>
+<h1>🎧 Mini Drumpad</h1>
+<div class="pad-grid" id="padGrid"></div>
+<button id="stopBtn">STOP</button>
+
+<script>
+const pads = [];
+const padGrid = document.getElementById("padGrid");
+const stopBtn = document.getElementById("stopBtn");
+
+// 8 Pads erstellen
+for (let i = 0; i < 8; i++) {
+  const pad = document.createElement("button");
+  pad.className = "pad";
+  pad.innerHTML = `Pad ${i+1} <span class="menu">⋮</span>`;
+  padGrid.appendChild(pad);
+
+  pads.push({ element: pad, sound: null, loop: false, audio: null });
+
+  // Klick -> Sound abspielen
+  pad.addEventListener("click", () => playSound(i));
+
+  // Dreipunkt-Menü -> Datei wählen
+  pad.querySelector(".menu").addEventListener("click", (event) => {
+    event.stopPropagation();
+    selectFile(i);
+  });
+}
+
+// Datei auswählen
+function selectFile(i) {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "audio/*";
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      pads[i].sound = url;
+      pads[i].element.innerHTML = `Pad ${i+1}<br>${file.name} <span class="menu">⋮</span>`;
+      pads[i].element.querySelector(".menu").addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        selectFile(i);
+      });
+    }
+  };
+  input.click();
+}
+
+// Sound abspielen / loopen
+function playSound(i) {
+  const pad = pads[i];
+  if (!pad.sound) return;
+
+  // Falls Loop aktiv -> stoppen
+  if (pad.loop) {
+    pad.audio.pause();
+    pad.audio.currentTime = 0;
+    pad.loop = false;
+    pad.element.classList.remove("active");
+    return;
+  }
+
+  const audio = new Audio(pad.sound);
+  pad.audio = audio;
+  pad.loop = true;
+  pad.element.classList.add("active");
+
+  audio.loop = true;
+  audio.play();
+}
+
+// STOP-Button: alles stoppen
+stopBtn.addEventListener("click", () => {
+  pads.forEach(pad => {
+    if (pad.audio) {
+      pad.audio.pause();
+      pad.audio.currentTime = 0;
+      pad.loop = false;
+      pad.element.classList.remove("active");
+    }
+  });
+});
+</script>
+</body>
+</html>
